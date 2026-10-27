@@ -384,18 +384,50 @@ save_fig("bar_Education")
 # Bachelor's degree holders form the largest group (50.38%). Customers with high-school-level education form the smallest group (2.45%, 49 customers).
 
 # NORMALITY TESTING
-for (v in names(dataN)) {
+# A normality test only makes sense when the histogram looks roughly bell-shaped.
+# From the histograms above, 13 of the 15 variables are clearly not normal, so they are not tested:
+# - Strongly right-skewed (long tail to the right): the five Mnt* columns,
+#   Total_amount_spent, NumDealsPurchases, NumWebPurchases, NumCatalogPurchases,
+#   NumStorePurchases.
+# - Flat (every value about equally common, uniform): Recency, Customer_Days.
+# - Piled up on the right with a few extreme high values: NumWebVisitsMonth.
+# Only Income and Age are roughly symmetric with one main hump, so only they are tested.
+
+# The nortest package provides lillie.test().
+# Run install.packages("nortest") once if the package is not installed.
+library(nortest)
+
+for (v in c("Income", "Age")) {
+  x <- data[[v]]
+
+  # Normal Q-Q plot: points far from the line suggest non-normality.
+  qqnorm(x, main = paste0("Normal Q-Q plot for ", v), cex = 0.8)
+  qqline(x, col = "red", lwd = 2)
+  save_fig(paste0("qq_", v))
+
+  # Kolmogorov-Smirnov test against a normal curve with the same mean and SD.
+  # H0: the data are normal; H1: they are not.
+  # suppressWarnings() hides the "ties" warning: Age is in whole years,
+  # so many customers share the same value.
   cat("\nVariable:", v, "\n")
-  print(shapiro.test(dataN[[v]]))
+  print(suppressWarnings(ks.test(x, "pnorm", mean = mean(x), sd = sd(x))))
+
+  # Lilliefors test: the K-S test corrected for estimating the mean and SD
+  # from the same data (the plain K-S p-value is too large in that case).
+  print(lillie.test(x))
 }
 # Observations:
-# Shapiro-Wilk tests were performed on all 15 numerical variables.
-# All p-values were below 0.05, providing evidence against normality.
-# Note: with about 2000 customers, Shapiro-Wilk flags even tiny departures from normality,
-# so we also judge by the Q-Q plots and skewness. These agree for the spending variables:
-# MntFruits (W = 0.69) and MntMeatProducts (W = 0.74) are strongly right-skewed.
-# Income (W = 0.985) and Age (W = 0.983) are close to normal in their Q-Q plots.
-# Overall we use non-parametric methods (Spearman, Wilcoxon, Kruskal-Wallis).
+# Both tests reject normality for Income and Age (all p-values < 0.001).
+# - Income: D = 0.047 (K-S p = 0.0003, Lilliefors p < 0.001).
+# - Age:    D = 0.058 (K-S p < 0.001, Lilliefors p < 0.001).
+# D is the same in both tests, but the Lilliefors p-value is much smaller:
+# the plain K-S test is too lenient when the mean and SD come from the data.
+# The gaps from a normal curve are small (D < 0.06), but with about 2000 customers even
+# small gaps are significant. The Q-Q plots show the kind of difference: the points bend
+# away from the line at both ends (flatter top and thinner tails than a normal curve).
+# Age has many tied values (only 56 different ages), which also affects the K-S test.
+# Conclusion: none of the 15 numerical variables is normal, so the later analysis uses
+# non-parametric methods (Spearman, Wilcoxon, Kruskal-Wallis).
 
 # SPEARMAN CORRELATION ANALYSIS
 cor_matrix <- cor(dataN, method = "spearman")
@@ -558,7 +590,7 @@ barplot(
   main = "Average Percentage of Purchases by Channel",
   xlab = "Purchasing Channel",
   ylab = "Average Percentage (%)",
-  col = "lightblue",
+  col = "#043f53",
   ylim = c(0, 60)
 )
 save_fig("bar_channels")
@@ -612,3 +644,5 @@ save_fig("bar_purchases_income")
 # Observations:
 # Average total purchases increase across income groups,
 # from 5.54 in Q1 (lowest income) to 19.44 in Q4 (highest income). This suggests that higher-income customers tend to make more purchases.
+
+
