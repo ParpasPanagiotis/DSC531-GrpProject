@@ -6,16 +6,27 @@
 rm(list = ls())
 gc()
 
-# Import the original CSV file (the CSV must be in the working directory).
-data <- read.csv("Food_raw.csv")
+# Find the project folder, so the script works whether R was started in the
+# project folder (as in VS Code) or in scripts/ (as in RStudio).
+project_dir <- if (file.exists("data/Food_raw.csv")) "." else ".."
+data_file <- file.path(project_dir, "data", "Food_raw.csv")
+fig_dir <- file.path(project_dir, "figures")
+
+# Import the original CSV file.
+data <- read.csv(data_file)
 
 # Folder where the figures for the report are saved.
-dir.create("figures", showWarnings = FALSE)
+# Recreates it if it is missing - nothing happens if it already exists.
+dir.create(fig_dir, showWarnings = FALSE)
 
-# Helper: copy the plot currently on screen to figures/<name>.png.
+# Copy the plot currently on screen to figures/<name>.png.
 save_fig <- function(name) {
-  dev.copy(png, file.path("figures", paste0(name, ".png")),
-           width = 900, height = 650)
+  dev.copy(
+    png,
+    file.path(fig_dir, paste0(name, ".png")),
+    width = 900,
+    height = 650
+  )
   invisible(dev.off())
 }
 
@@ -37,55 +48,114 @@ data <- data[!duplicated(data), ]
 nrow(data)
 # Result: 2205 -> 2002 customers.
 
-# Logic check 1: total spent must equal the sum of the five Mnt* columns.
-mnt_cols <- c("MntWines", "MntFruits", "MntMeatProducts",
-              "MntFishProducts", "MntSweetProducts")
+# Logic check 1: Total spent = sum(Mnt*)
+####################################################
+
+mnt_cols <- c(
+  "MntWines",
+  "MntFruits",
+  "MntMeatProducts",
+  "MntFishProducts",
+  "MntSweetProducts"
+)
 all(data$Total_amount_spent == rowSums(data[mnt_cols]))
 # Result: TRUE. Total_amount_spent is built from the Mnt* columns, so it
 # should not be used in the same test or model as those columns.
 
-# Logic checks 2 and 3: purchases.
-purchases <- data$NumWebPurchases + data$NumCatalogPurchases +
+# Logic check 2: a customer with 0 purchases should have spent nothing.
+purchases <- data$NumWebPurchases +
+  data$NumCatalogPurchases +
   data$NumStorePurchases
 # Customers with 0 purchases but money spent.
-sum(purchases == 0)
-# Customers with more discount purchases than purchases in total.
+sum(purchases == 0 & data$Total_amount_spent > 0)
+# Show how much each of them spent.
+data$Total_amount_spent[purchases == 0]
+# Result: 4 customers made 0 purchases but spent 4-8, so they are removed.
+data <- data[!(purchases == 0 & data$Total_amount_spent > 0), ]
+nrow(data)
+# 2002 -> 1998 customers.
+
+# Logic check 3: discount purchases cannot exceed purchases in total.
+# Recalculate (because rows were removed)
+purchases <- data$NumWebPurchases +
+  data$NumCatalogPurchases +
+  data$NumStorePurchases
 sum(data$NumDealsPurchases > purchases)
-data[purchases == 0 | data$NumDealsPurchases > purchases, ]
-# Result: 5 customers break these rules (impossible values), so they are
-# removed. 2002 -> 1997 customers.
-data <- data[!(purchases == 0 | data$NumDealsPurchases > purchases), ]
+data[data$NumDealsPurchases > purchases, ]
+# Result: 1 customer breaks this rule
+data <- data[!(data$NumDealsPurchases > purchases), ]
 rownames(data) <- NULL
 nrow(data)
+# 1998 -> 1997 customers.
 
-# Outlier check with the 1.5 x IQR rule for every numeric column.
-iqr_outliers <- function(x) {
-  q <- quantile(x, c(0.25, 0.75))
-  sum(x < q[1] - 1.5 * IQR(x) | x > q[2] + 1.5 * IQR(x))
-}
-sapply(data[, c("Income", "Age", mnt_cols, "NumDealsPurchases",
-                "NumWebPurchases", "NumCatalogPurchases",
-                "NumWebVisitsMonth", "Total_amount_spent")], iqr_outliers)
-# Result: Income and Age have no outliers (Income 1,730-113,734, Age 24-80).
-# The spending columns have many (e.g. 220 for fruits, 166 for meat), but these
-# come from the strong right skew, not from errors: a few customers simply
-# spend a lot. They are real customers, so all of them are kept.
+# The remaining checks are run on the 1997 customers left after cleaning.
+# They all pass (or are kept with a reason), so no more rows are removed.
+purchases <- data$NumWebPurchases +
+  data$NumCatalogPurchases +
+  data$NumStorePurchases
+
+# Logic check 4: each customer has exactly one marital status.
+marital_cols <- c("Divorced", "Married", "Single", "Living_together", "Widow")
+table(rowSums(data[marital_cols]))
+# Result: all 1997 customers have exactly one (every row sums to 1).
+
+# Logic check 5: each customer has exactly one education level.
+education_cols <- c(
+  "Up_to_high_school",
+  "Up_to_undergraduate_degree",
+  "Up_to_masters_degree",
+  "PhD"
+)
+table(rowSums(data[education_cols]))
+# Result: all 1997 customers have exactly one (every row sums to 1).
+
+# Logic check 6: indicator columns (marital, education, Complain) contain only 0 or 1.
+all(unlist(data[c(marital_cols, education_cols, "Complain")]) %in% c(0, 1))
+# Result: TRUE.
+
+# Logic check 7: no negative values in any column.
+any(data < 0)
+# Result: FALSE.
+
+# Logic check 8: all counts and amounts are whole numbers.
+all(sapply(data, function(x) all(x == round(x))))
+# Result: TRUE.
+
+# Logic check 9: number of small children and teenagers at home.
+table(data$Kidhome)
+table(data$Teenhome)
+# Result: both only take the values 0, 1 and 2.
+
+# Logic check 10: income is positive and age is realistic.
+all(data$Income > 0)
+range(data$Age)
+# Result: TRUE, and ages are 24-80.
+
+# Logic check 11: the last purchase cannot be before the customer joined.
+sum(data$Recency > data$Customer_Days)
+# Result: 0 (Recency is 0-99 days, Customer_Days is 2159-2858 days).
+
+# Logic check 12: a customer with purchases should have spent something
+# (the opposite direction of check 2).
+sum(purchases > 0 & data$Total_amount_spent == 0)
+# Result: 0.
+
+# Logic check 13: age when the customer joined (age minus years as a customer).
+age_at_joining <- data$Age - data$Customer_Days / 365
+sum(age_at_joining < 18)
+min(age_at_joining)
+# Result: 4 customers were 16-18 when they joined (youngest about 16.4).
+# We assume that it can happen
 
 # CLEANING LOG (for the report):
 # - 0 missing values.
 # - 203 duplicate rows removed (2205 -> 2002).
 # - 5 rows with impossible purchase counts removed (2002 -> 1997).
-# - Outliers kept: they reflect skew, not data errors.
-
+# - All other logic checks (4-14) pass.
 
 # 2. GROUP MARITAL STATUS INDICATORS ----------------------------------------
 
-marital_cols <- c("Divorced", "Married", "Single", "Living_together", "Widow")
-
-# Each customer should belong to exactly one marital-status category.
-table(rowSums(data[marital_cols]))
-
-# Combine the five indicator columns into one categorical variable.
+# Combine marital status into one categorical variable.
 data$Marital_State <- ifelse(data$Divorced == 1, "Divorced", "")
 
 data$Marital_State <- ifelse(data$Married == 1, "Married", data$Marital_State)
@@ -108,13 +178,7 @@ data <- data[, !(names(data) %in% marital_cols)]
 
 # 3. GROUP EDUCATION INDICATORS --------------------------------------------
 
-education_cols <- c("Up_to_high_school", "Up_to_undergraduate_degree",
-                    "Up_to_masters_degree", "PhD")
-
-# Each customer should have exactly one education level.
-table(rowSums(data[education_cols]))
-
-# Combine the four education indicators into one categorical variable.
+# Combine Education into one categorical variable.
 data$schoolinglevel <- ifelse(data$Up_to_high_school == 1, "hs", "")
 data$schoolinglevel <- ifelse(
   data$Up_to_undergraduate_degree == 1,
@@ -149,8 +213,10 @@ table(data$schoolinglevel)
 # Exclude Kidhome, Teenhome and Complain from the continuous-variable plots,
 # and the two categorical factors created above.
 # These excluded variables are described later using frequency tables.
-dataN <- data[, !(names(data) %in% c("Kidhome", "Teenhome", "Complain",
-                                     "Marital_State", "schoolinglevel"))]
+dataN <- data[,
+  !(names(data) %in%
+    c("Kidhome", "Teenhome", "Complain", "Marital_State", "schoolinglevel"))
+]
 
 # The e1071 package provides skewness() and kurtosis().
 # Run install.packages("e1071") once if the package is not installed.
@@ -165,7 +231,9 @@ for (v in colnames) {
   i <- i + 1
   x <- dataN[[v]]
 
-  # Descriptive statistics: measures of centre, variability and shape.
+  # Descriptive statistics: range, centre, variability and shape.
+  min_value <- min(x)
+  max_value <- max(x)
   m <- mean(x)
   med <- median(x)
   variance <- var(x)
@@ -182,6 +250,8 @@ for (v in colnames) {
   # Print the results in the Console.
   cat("\n-----------------------------\n")
   cat("Variable:", v, "\n")
+  cat("Min:", min_value, "\n")
+  cat("Max:", max_value, "\n")
   cat("Mean:", m, "\n")
   cat("Median:", med, "\n")
   cat("Mode:", mode_value, "\n")
@@ -229,9 +299,26 @@ for (v in colnames) {
   abline(a = 0, b = 1, col = "blue", lwd = 2)
   save_fig(paste0("qq_", v))
 }
+# Observations:
+# All values are in a sensible range: no negative amounts, Age 24-80,
+# Income 2,447-113,734. (An income of 2,447 is unusually low but possible, so it is kept.)
+# For the spending columns the mean is far above the median
+# (e.g. MntFruits: median 8, mean 26.5), so they are strongly right-skewed.
 
+# OUTLIER CHECK
+# Count values outside the 1.5 x IQR rule (the points beyond the boxplot whiskers).
+iqr_outliers <- function(x) {
+  q <- quantile(x, c(0.25, 0.75))
+  sum(x < q[1] - 1.5 * IQR(x) | x > q[2] + 1.5 * IQR(x))
+}
+sapply(dataN, iqr_outliers)
+# Result: Income, Age, Recency, Customer_Days and NumStorePurchases have no outliers.
+# The spending columns have many (e.g. 220 for fruits, 166 for meat), but the
+# histograms and skewness above show these come from the strong right skew,
+# not from errors: a few customers simply spend a lot. They are real customers,
+# so all of them are kept.
 
-# CATEGORICAL DESCRIPTIVE ANALYSIS
+# DESCRIPTIVE ANALYSIS: CATEGORICAL AND DISCRETE VARIABLES
 # Number of Small Children per Household. This analysis shows how many customers have 0, 1, or more small children in their households.
 table(data$Kidhome)
 round(prop.table(table(data$Kidhome)) * 100, 2)
@@ -380,7 +467,12 @@ p_children <- ggplot(
     y = "Total Amount Spent"
   )
 print(p_children)
-ggsave("figures/violin_spending_children.png", p_children, width = 8, height = 6)
+ggsave(
+  file.path(fig_dir, "violin_spending_children.png"),
+  p_children,
+  width = 8,
+  height = 6
+)
 # Display median spending for each group.
 tapply(data$Total_amount_spent, data$Children, median)
 
@@ -427,7 +519,8 @@ save_fig("box_spending_marital")
 
 # INCOME VS TOTAL SPENDING
 plot(
-  data$Income, data$Total_amount_spent,
+  data$Income,
+  data$Total_amount_spent,
   main = "Income vs Total Spending",
   xlab = "Income",
   ylab = "Total Amount Spent",
