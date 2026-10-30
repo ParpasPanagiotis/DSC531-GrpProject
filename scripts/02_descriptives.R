@@ -1,36 +1,33 @@
 # MAS531 - Food Project
 # 02_descriptives.R: univariate analysis, outliers and normality.
-# Input: data/food_clean.rds (run 01_cleaning.R first).
 
 rm(list = ls())
 
-# Find the project folder, so the script works whether R was started in the
-# project folder (as in VS Code) or in scripts/ (as in RStudio).
+# Find the project folder ( project_dir = . for R, .. for vscode)
 project_dir <- if (file.exists("data/Food_raw.csv")) "." else ".."
 source(file.path(project_dir, "scripts", "00_setup.R"))
 
 # Load the cleaned dataset.
 data <- readRDS(clean_file)
 
+####################################################
+# NUMERICAL VARIABLES AND DESCRIPTIVE STATISTICS ---
+####################################################
 
-# NUMERICAL VARIABLES AND DESCRIPTIVE STATISTICS ---------------------------
-
-# The 15 numerical variables (listed in 00_setup.R). Kidhome, Teenhome and
-# Complain are described later using frequency tables.
+# The 15 numerical variables (listed in 00_setup.R)
 dataN <- data[num_cols]
 
-# The e1071 package provides skewness() and kurtosis().
-# Run install.packages("e1071") once if the package is not installed.
+# Load the e1071 package for skewness() and kurtosis().
 library(e1071)
 
-colnames <- names(dataN)
-colours <- rep(c("red", "blue", "darkgreen", "gold", "purple"), 3)
-
-# Loop over each numeric variable to calculate statistics and display plots.
-i <- 0
-for (v in colnames) {
-  i <- i + 1
-  x <- dataN[[v]]
+# Describe one numeric variable: print its statistics and draw its boxplot
+# and histogram.
+# v is the column name as text, e.g. describe_var("Income").
+# save = TRUE also saves both plots to figures/ (used by the loop below).
+# By default a single call only shows the plots, so it does not overwrite
+# the report figures.
+describe_var <- function(v, colour = "lightblue", save = FALSE) {
+  x <- data[[v]]
 
   # Descriptive statistics: range, centre, variability and shape.
   min_value <- min(x)
@@ -41,10 +38,7 @@ for (v in colnames) {
   standard_dev <- sd(x)
   iqr <- IQR(x)
   skew <- skewness(x)
-  kurt <- kurtosis(x) # Excess kurtosis: a normal distribution has value 0.
-
-  # Statistical mode = most frequent observed value (not always informative
-  # for continuous variables; in case of ties, the first mode is shown).
+  kurt <- kurtosis(x)
   frequency <- table(x)
   mode_value <- names(frequency)[which.max(frequency)]
 
@@ -63,8 +57,8 @@ for (v in colnames) {
   cat("Excess kurtosis:", kurt, "\n")
 
   # Boxplot: useful for spread and potential outliers.
-  boxplot(x, main = paste0("Boxplot for ", v), col = colours[i], ylab = v)
-  save_fig(paste0("box_", v))
+  boxplot(x, main = paste0("Boxplot for ", v), col = colour, ylab = v)
+  if (save) save_fig(paste0("box_", v))
 
   # Histogram: shows the distribution of the observed values.
   hist(
@@ -72,34 +66,22 @@ for (v in colnames) {
     breaks = 20,
     xlab = v,
     main = paste0("Histogram for ", v),
-    col = colours[i]
+    col = colour
   )
-  save_fig(paste0("hist_", v))
-
-  # Compare the density of standardized data with a standard normal curve.
-  dens <- density(as.numeric(scale(x)))
-  plot(
-    dens,
-    main = paste0("Standardized data vs normal: ", v),
-    col = "red",
-    xlab = "Standardized values"
-  )
-  lines(dens$x, dnorm(dens$x), col = "blue")
-  legend(
-    "topright",
-    legend = c("Standardized data", "Standard normal"),
-    col = c("red", "blue"),
-    lty = 1,
-    cex = 0.8
-  )
-
-  # Normal Q-Q plot: large deviations from the line suggest non-normality.
-  qqnorm(scale(x), main = paste0("Normal Q-Q plot for ", v), cex = 0.8)
-  qqline(scale(x), col = "red", lwd = 2)
-  # The blue line represents y=x after standardization (visual reference).
-  abline(a = 0, b = 1, col = "blue", lwd = 2)
-  save_fig(paste0("qq_", v))
+  if (save) save_fig(paste0("hist_", v))
 }
+
+# To look at one variable only, run the lines above (including the function)
+# and then, for example:
+# describe_var("Income")
+
+# Describe all 15 numeric variables (this also saves all their figures).
+colours <- rep(c("red", "blue", "darkgreen", "gold", "purple"), 3)
+for (i in seq_along(num_cols)) {
+  describe_var(num_cols[i], colours[i], save = TRUE)
+}
+# Normality is checked separately below (NORMALITY TESTING), and only for
+# the variables whose histogram looks roughly bell-shaped.
 # Observations:
 # All values are in a sensible range: no negative amounts, Age 24-80,
 # Income 2,447-113,734. (An income of 2,447 is unusually low but possible, so it is kept.)

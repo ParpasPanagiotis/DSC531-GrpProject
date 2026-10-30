@@ -136,13 +136,21 @@ channel_percentages <- c(
   Store = mean(data$StorePercent)
 )
 round(channel_percentages, 2)
-barplot(
+# barplot() returns the x-position of each bar, used to place the labels.
+bar_pos <- barplot(
   channel_percentages,
   main = "Average Percentage of Purchases by Channel",
   xlab = "Purchasing Channel",
   ylab = "Average Percentage (%)",
   col = "#043f53",
   ylim = c(0, 60)
+)
+# Write each percentage just above its bar.
+text(
+  bar_pos,
+  channel_percentages,
+  labels = paste0(round(channel_percentages, 1), "%"),
+  pos = 3
 )
 save_fig("bar_channels")
 
@@ -158,7 +166,7 @@ channel_age_percent <- rbind(
   Store = tapply(data$StorePercent, data$AgeGroup, mean)
 )
 round(channel_age_percent, 2)
-barplot(
+bar_pos <- barplot(
   channel_age_percent,
   beside = TRUE,
   main = "Average Purchasing Channel Percentages by Age Group",
@@ -167,6 +175,14 @@ barplot(
   col = c("lightblue", "lightgreen", "lightpink"),
   legend.text = TRUE,
   ylim = c(0, 70)
+)
+# Write each percentage just above its bar.
+text(
+  bar_pos,
+  channel_age_percent,
+  labels = round(channel_age_percent, 1),
+  pos = 3,
+  cex = 0.8
 )
 save_fig("bar_channels_age")
 
@@ -195,3 +211,133 @@ save_fig("bar_purchases_income")
 # Observations:
 # Average total purchases increase across income groups,
 # from 5.54 in Q1 (lowest income) to 19.44 in Q4 (highest income). This suggests that higher-income customers tend to make more purchases.
+
+# DISCOUNT PURCHASES BY NUMBER OF CHILDREN AND BY INCOME
+# Are families and lower-income customers more price-sensitive?
+# DealPercent (created in 01_cleaning.R) is the share of each customer's purchases
+# made with a discount. A share is fairer than a count, because customers who buy
+# more also tend to have more discount purchases.
+tapply(data$NumDealsPurchases, data$Children, median)
+round(tapply(data$DealPercent, data$Children, mean), 2)
+boxplot(
+  DealPercent ~ Children,
+  data = data,
+  main = "Share of Purchases Made with a Discount, by Number of Children",
+  xlab = "Number of Children",
+  ylab = "Discount Purchases (% of all purchases)",
+  col = "lightblue"
+)
+save_fig("box_deals_children")
+
+round(tapply(data$DealPercent, data$IncomeGroup, mean), 2)
+boxplot(
+  DealPercent ~ IncomeGroup,
+  data = data,
+  main = "Share of Purchases Made with a Discount, by Income Group",
+  xlab = "Income Group",
+  ylab = "Discount Purchases (% of all purchases)",
+  col = "lightblue"
+)
+save_fig("box_deals_income")
+
+# Spearman correlations of the discount share with children and income.
+round(cor(data$DealPercent, data$Children, method = "spearman"), 2)
+round(cor(data$DealPercent, data$Income, method = "spearman"), 2)
+
+# Observations:
+# Families rely much more on discounts. The average discount share rises from 8.8%
+# (no children) to 24.9% (1 child) and about 43% (2 or 3 children);
+# the median number of discount purchases goes from 1 to 3.
+# The discount share also falls steadily with income: 36.4% in Q1, 32.6% in Q2,
+# 19.7% in Q3 and only 7.6% in Q4 (Spearman rho = -0.73).
+# So yes: families and lower-income customers are clearly more price-sensitive.
+# (Children and income are related, so part of these two effects may overlap.)
+
+# WEB VISITS VS WEB PURCHASES
+# Do visits to the website turn into purchases on the website?
+plot(
+  jitter(data$NumWebVisitsMonth),
+  jitter(data$NumWebPurchases),
+  main = "Web Visits (last month) vs Web Purchases",
+  xlab = "Number of Web Visits Last Month",
+  ylab = "Number of Web Purchases",
+  col = rgb(0, 0, 1, 0.3),
+  pch = 16
+)
+# jitter() moves each point slightly at random, so customers with the same
+# whole-number values do not hide behind each other.
+lines(
+  lowess(data$NumWebVisitsMonth, data$NumWebPurchases),
+  col = "red",
+  lwd = 2
+)
+save_fig("scatter_webvisits_webpurchases")
+
+round(cor(data$NumWebVisitsMonth, data$NumWebPurchases, method = "spearman"), 2)
+
+# Who visits the website most often? Compare customers by number of visits.
+visit_group <- cut(
+  data$NumWebVisitsMonth,
+  breaks = c(-1, 2, 5, 8, Inf),
+  labels = c("0-2", "3-5", "6-8", "9+")
+)
+table(visit_group)
+round(tapply(data$NumWebPurchases, visit_group, mean), 1)
+tapply(data$Income, visit_group, median)
+tapply(data$Total_amount_spent, visit_group, median)
+
+# Observations:
+# Web visits do not turn into web purchases: the correlation is almost zero
+# (rho = -0.09), and customers make about 4 web purchases on average whatever
+# their number of visits.
+# The customers who visit most often are the lower-income, lower-spending ones:
+# median income falls from 77,382 (0-2 visits) to 31,814 (9+ visits), and median
+# spending from 1,112 to 118. They may be browsing for offers rather than buying.
+# Note: visits cover the last month only, while purchases cover a longer period.
+
+# RECENCY AND LENGTH OF CUSTOMER RELATIONSHIP VS SPENDING
+# Are long-term customers more valuable? Do recent buyers spend more?
+plot(
+  data$Recency,
+  data$Total_amount_spent,
+  main = "Days Since Last Purchase vs Total Spending",
+  xlab = "Days Since Last Purchase (Recency)",
+  ylab = "Total Amount Spent",
+  col = rgb(0, 0, 1, 0.3),
+  pch = 16
+)
+lines(lowess(data$Recency, data$Total_amount_spent), col = "red", lwd = 2)
+save_fig("scatter_recency_spending")
+
+plot(
+  data$Customer_Days,
+  data$Total_amount_spent,
+  main = "Days as a Customer vs Total Spending",
+  xlab = "Days as a Customer",
+  ylab = "Total Amount Spent",
+  col = rgb(0, 0, 1, 0.3),
+  pch = 16
+)
+lines(lowess(data$Customer_Days, data$Total_amount_spent), col = "red", lwd = 2)
+save_fig("scatter_customerdays_spending")
+
+round(cor(data$Recency, data$Total_amount_spent, method = "spearman"), 2)
+round(cor(data$Customer_Days, data$Total_amount_spent, method = "spearman"), 2)
+
+# Median spending for each quarter of customers, from newest to longest-standing.
+customer_days_group <- cut(
+  data$Customer_Days,
+  breaks = quantile(data$Customer_Days, c(0, 0.25, 0.5, 0.75, 1)),
+  labels = c("Newest 25%", "Q2", "Q3", "Longest 25%"),
+  include.lowest = TRUE
+)
+tapply(data$Total_amount_spent, customer_days_group, median)
+
+# Observations:
+# Recency has no relationship with spending (rho = 0.02): how long ago a customer
+# last bought tells us nothing about how much they spend.
+# Length of relationship has a weak positive relationship (rho = 0.18), but it is
+# clear in the medians: from 150.5 for the newest quarter of customers to 523 for
+# the longest-standing quarter. So long-term customers are more valuable.
+# Note: all customers have been with the company for 5.9-7.8 years, so this compares
+# long-term customers with very long-term ones, not new with old.
