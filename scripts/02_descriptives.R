@@ -22,11 +22,19 @@ library(e1071)
 
 # Describe one numeric variable: print its statistics and draw its boxplot
 # and histogram.
-# v is the column name as text, e.g. describe_var("Income").
-# save = TRUE also saves both plots to figures/ (used by the loop below).
-# By default a single call only shows the plots, so it does not overwrite
-# the report figures.
+# v is the column name as text (e.g. "Income").
+# (,save = TRUE) saves both plots to figures/ (default is False)
 describe_var <- function(v, colour = "lightblue", save = FALSE) {
+  # Input checks:
+  # 1. v must be a column of data
+  if (!(v %in% names(data))) {
+    stop("'", v, "' is not a variable in the data. Check the spelling.")
+  }
+  # 2. The column must be numerical (e.g. Marital_State is a factor).
+  if (!is.numeric(data[[v]])) {
+    stop("'", v, "' is not a numerical variable.")
+  }
+
   x <- data[[v]]
 
   # Descriptive statistics: range, centre, variability and shape.
@@ -56,9 +64,16 @@ describe_var <- function(v, colour = "lightblue", save = FALSE) {
   cat("Skewness:", skew, "\n")
   cat("Excess kurtosis:", kurt, "\n")
 
+  # Split the graph window
+  if (!save) {
+    par(mfrow = c(1, 2))
+  }
+
   # Boxplot: useful for spread and potential outliers.
   boxplot(x, main = paste0("Boxplot for ", v), col = colour, ylab = v)
-  if (save) save_fig(paste0("box_", v))
+  if (save) {
+    save_fig(paste0("box_", v))
+  }
 
   # Histogram: shows the distribution of the observed values.
   hist(
@@ -68,28 +83,33 @@ describe_var <- function(v, colour = "lightblue", save = FALSE) {
     main = paste0("Histogram for ", v),
     col = colour
   )
-  if (save) save_fig(paste0("hist_", v))
+  if (save) {
+    save_fig(paste0("hist_", v))
+  }
+
+  # Back to one plot per window
+  if (!save) par(mfrow = c(1, 1))
 }
 
-# To look at one variable only, run the lines above (including the function)
-# and then, for example:
-# describe_var("Income")
-
-# Describe all 15 numeric variables (this also saves all their figures).
+# Describe all 15 numeric variables and save all their figures
 colours <- rep(c("red", "blue", "darkgreen", "gold", "purple"), 3)
 for (i in seq_along(num_cols)) {
   describe_var(num_cols[i], colours[i], save = TRUE)
 }
 # Normality is checked separately below (NORMALITY TESTING), and only for
 # the variables whose histogram looks roughly bell-shaped.
+
 # Observations:
 # All values are in a sensible range: no negative amounts, Age 24-80,
-# Income 2,447-113,734. (An income of 2,447 is unusually low but possible, so it is kept.)
+# Income 2,447-113,734.
 # For the spending columns the mean is far above the median
 # (e.g. MntFruits: median 8, mean 26.5), so they are strongly right-skewed.
 
+####################################################
 # OUTLIER CHECK
-# Count values outside the 1.5 x IQR rule (the points beyond the boxplot whiskers).
+####################################################
+
+# Count values outside the 1.5 x IQR rule
 iqr_outliers <- function(x) {
   q <- quantile(x, c(0.25, 0.75))
   sum(x < q[1] - 1.5 * IQR(x) | x > q[2] + 1.5 * IQR(x))
@@ -101,7 +121,10 @@ sapply(dataN, iqr_outliers)
 # not from errors: a few customers simply spend a lot. They are real customers,
 # so all of them are kept.
 
+####################################################
 # DESCRIPTIVE ANALYSIS: CATEGORICAL AND DISCRETE VARIABLES
+####################################################
+
 # Number of Small Children per Household. This analysis shows how many customers have 0, 1, or more small children in their households.
 table(data$Kidhome)
 round(prop.table(table(data$Kidhome)) * 100, 2)
@@ -166,18 +189,24 @@ save_fig("bar_Education")
 # Observation:
 # Bachelor's degree holders form the largest group (50.38%). Customers with high-school-level education form the smallest group (2.45%, 49 customers).
 
+####################################################
 # NORMALITY TESTING
+####################################################
 # A normality test only makes sense when the histogram looks roughly bell-shaped.
 # From the histograms above, 13 of the 15 variables are clearly not normal, so they are not tested:
-# - Strongly right-skewed (long tail to the right): the five Mnt* columns,
-#   Total_amount_spent, NumDealsPurchases, NumWebPurchases, NumCatalogPurchases,
-#   NumStorePurchases.
-# - Flat (every value about equally common, uniform): Recency, Customer_Days.
-# - Piled up on the right with a few extreme high values: NumWebVisitsMonth.
-# Only Income and Age are roughly symmetric with one main hump, so only they are tested.
+# -> Strongly right-skewed:
+#       `Total_amount_spent`,
+#       `NumDealsPurchases`,
+#       `NumWebPurchases`,
+#       `NumCatalogPurchases`,
+#       `NumStorePurchases`
+# -> Flat (~uniform):
+#       `Recency`,
+#       `Customer_Days`
+# -> Piled up on the right with a few extreme high values: `NumWebVisitsMonth`.
+# Only `Income` and `Age` are roughly symmetric with one main hump, so only they are tested.
 
-# The nortest package provides lillie.test().
-# Run install.packages("nortest") once if the package is not installed.
+# Load the nortest package for lillie.test()
 library(nortest)
 
 for (v in c("Income", "Age")) {
@@ -188,6 +217,7 @@ for (v in c("Income", "Age")) {
   qqline(x, col = "red", lwd = 2)
   save_fig(paste0("qq_", v))
 
+  print("----------------------------------")
   # Kolmogorov-Smirnov test against a normal curve with the same mean and SD.
   # H0: the data are normal; H1: they are not.
   # suppressWarnings() hides the "ties" warning: Age is in whole years,
@@ -198,6 +228,7 @@ for (v in c("Income", "Age")) {
   # Lilliefors test: the K-S test corrected for estimating the mean and SD
   # from the same data (the plain K-S p-value is too large in that case).
   print(lillie.test(x))
+  print("----------------------------------")
 }
 # Observations:
 # Both tests reject normality for Income and Age (all p-values < 0.001).
