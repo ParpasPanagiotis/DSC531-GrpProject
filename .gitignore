@@ -1,0 +1,14 @@
+# Editor and linter settings (personal setup)
+.vscode/
+.lintr
+
+# Private team documents
+InstructionEmail.txt
+Project_Plan.md
+Variables.md
+
+# Files R creates automatically
+Rplots.pdf
+.Rhistory
+.RData
+.Rproj.user/
