@@ -14,24 +14,42 @@ data <- readRDS(clean_file)
 # The 15 numerical variables (listed in 00_setup.R).
 dataN <- data[num_cols]
 
-# Load ggplot2 for the violin plot
+# Load ggplot2 for the heatmap and the violin plot
 library(ggplot2)
 
 # SPEARMAN CORRELATION ANALYSIS
 # -----------------------------
 
 cor_matrix <- cor(dataN, method = "spearman")
-heatmap(
-  cor_matrix,
-  main = "Spearman Correlation Heatmap",
-  col = colorRampPalette(c("blue", "white", "red"))(100),
-  symm = TRUE,
-  Rowv = NA,
-  Colv = NA,
-  scale = "none",
-  margins = c(10, 10)
+
+# Heatmap with ggplot2 (base R heatmap() cannot draw a colour scale bar).
+# ggplot needs one row per pair of variables: as.table() turns the matrix
+# into a table, and as.data.frame() into columns Var1, Var2 and the value.
+cor_long <- as.data.frame(as.table(cor_matrix))
+names(cor_long) <- c("Var1", "Var2", "rho")
+
+p_heatmap <- ggplot(cor_long, aes(x = Var1, y = Var2, fill = rho)) +
+  geom_tile(color = "white") + # one coloured square per pair
+  geom_text(aes(label = round(rho, 2)), size = 2.5) + # the value in each square
+  scale_fill_gradient2( # blue = negative, white = 0, red = positive
+    low = "blue",
+    mid = "white",
+    high = "red",
+    midpoint = 0,
+    limits = c(-1, 1),
+    name = "Spearman\nrho"
+  ) +
+  labs(title = "Spearman Correlation Heatmap", x = NULL, y = NULL) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # slanted names
+print(p_heatmap)
+ggsave(
+  file.path(fig_dir, "heatmap_spearman.png"),
+  p_heatmap,
+  width = 9,
+  height = 7.5,
+  bg = "white"
 )
-save_fig("heatmap_spearman")
 # Examine correlations specifically with Total Spending.
 round(cor_matrix["Total_amount_spent", ], 2)
 
@@ -62,8 +80,9 @@ print(p_children)
 ggsave(
   file.path(fig_dir, "violin_spending_children.png"),
   p_children,
-  width = 8,
-  height = 6
+  width = 6,
+  height = 4.5,
+  bg = "white"
 )
 # Display median spending for each group.
 tapply(data$Total_amount_spent, data$Children, median)
@@ -105,7 +124,8 @@ boxplot(
   main = "Total Spending by Marital Status",
   xlab = "Marital Status",
   ylab = "Total Amount Spent",
-  col = "lightblue"
+  col = "lightblue",
+  cex.axis = 0.8 # smaller axis labels, so "Living together" fits
 )
 save_fig("box_spending_marital")
 # Observations:
@@ -179,7 +199,8 @@ round(channel_age_percent, 2)
 bar_pos <- barplot(
   channel_age_percent,
   beside = TRUE,
-  main = "Average Purchasing Channel Percentages by Age Group",
+  main = "Average Purchasing Channel Percentages
+by Age Group",
   xlab = "Age Group",
   ylab = "Average Percentage of Purchases (%)",
   col = c("lightblue", "lightgreen", "lightpink"),
@@ -216,7 +237,8 @@ bar_pos <- barplot(
   main = "Average Total Purchases by Income Group",
   xlab = "Income Group",
   ylab = "Average Number of Purchases",
-  col = "lightblue"
+  col = "lightblue",
+  ylim = c(0, 22) # so the axis goes above the tallest bar (19.4)
 )
 text(
   bar_pos,
@@ -241,7 +263,8 @@ round(tapply(data$DealPercent, data$Children, mean), 2)
 boxplot(
   DealPercent ~ Children,
   data = data,
-  main = "Share of Purchases Made with a Discount, by Number of Children",
+  main = "Share of Purchases Made with a Discount,
+by Number of Children",
   xlab = "Number of Children",
   ylab = "Discount Purchases (% of all purchases)",
   col = "lightblue"
@@ -259,7 +282,8 @@ round(tapply(data$DealPercent, data$IncomeGroup, mean), 2)
 boxplot(
   DealPercent ~ IncomeGroup,
   data = data,
-  main = "Share of Purchases Made with a Discount, by Income Group",
+  main = "Share of Purchases Made with a Discount,
+by Income Group",
   xlab = "Income Group",
   ylab = "Discount Purchases (% of all purchases)",
   col = "lightblue"

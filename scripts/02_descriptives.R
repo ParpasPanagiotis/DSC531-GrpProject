@@ -133,7 +133,8 @@ barplot(
   main = "Number of Small Children per Household",
   xlab = "Number of Small Children",
   ylab = "Number of Customers",
-  col = "lightblue"
+  col = "lightblue",
+  ylim = c(0, 1200) # so the axis goes above the tallest bar
 )
 save_fig("bar_Kidhome")
 # Observation:
@@ -147,7 +148,8 @@ barplot(
   main = "Number of Teenagers per Household",
   xlab = "Number of Teenagers",
   ylab = "Number of Customers",
-  col = "lightblue"
+  col = "lightblue",
+  ylim = c(0, 1200) # so the axis goes above the tallest bar
 )
 save_fig("bar_Teenhome")
 # Observation:
@@ -169,7 +171,9 @@ barplot(
   main = "Distribution of Marital Status",
   xlab = "Marital Status",
   ylab = "Number of Customers",
-  col = "lightblue"
+  col = "lightblue",
+  ylim = c(0, 800), # so the axis goes above the tallest bar (777)
+  cex.names = 0.8 # smaller bar labels, so "Living together" fits
 )
 save_fig("bar_Marital")
 # Observation:

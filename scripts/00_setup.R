@@ -14,8 +14,10 @@ save_fig <- function(name) {
   dev.copy(
     png,
     file.path(fig_dir, paste0(name, ".png")),
-    width = 900,
-    height = 650
+    width = 6,
+    height = 4.5,
+    units = "in", # size in inches instead of pixels
+    res = 150 # resolution: 150 dots per inch (sharp but not huge)
   )
   invisible(dev.off())
 }

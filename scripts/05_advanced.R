@@ -223,7 +223,8 @@ plot(
   pch = 19,
   xlab = "PC1 (overall buying power, 56%)",
   ylab = "PC2 (online wine buyers, 12%)",
-  main = "Customer Clusters on the First Two Principal Components"
+  main = "Customer Clusters on the
+First Two Principal Components"
 )
 legend(
   "topright",
