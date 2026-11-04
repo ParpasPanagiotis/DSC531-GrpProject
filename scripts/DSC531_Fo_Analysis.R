@@ -1,5 +1,5 @@
 # ==================================================================
-# MAS531 - Group Project "Fo" (Food)
+# DSC531 - Group Project "Fo" (Food)
 #
 # This file contains:
 #   PART 0. Setup: paths, helper function and column lists

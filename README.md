@@ -1,6 +1,6 @@
 # Food Customers: Exploratory Data Analysis
 
-Group project for **MAS531**, MSc Data Science.
+Group project for **DSC531**, MSc Data Science.
 
 An exploratory analysis of the marketing data of a food company: who its customers are, how they spend, and which customer characteristics are related to spending.
 
