@@ -8,20 +8,15 @@
 #   PART 3. Bivariate analysis: correlations and relationships
 #   PART 4. Hypothesis testing
 #   PART 5. PCA, clustering (customer segments) and regression
-#
-# Input:  the data CSV file, chosen in a window when the file is run
-# Output: food_clean.rds (cleaned data) and all plots in a figures/
-#         folder, both saved in the same folder as the CSV file
-# Packages needed: e1071, nortest, ggplot2
 # ==================================================================
 
 # Clear the workspace and release unused memory.
 rm(list = ls())
 gc()
 
-# ##################################################################
+# #############
 # PART 0. SETUP
-# ##################################################################
+# #############
 
 # Paths
 # Select the data CSV file
@@ -94,9 +89,9 @@ education_cols <- c(
 )
 
 
-# ##################################################################
+# ##################################################
 # PART 1. IMPORT, CHECKS, CLEANING AND NEW VARIABLES
-# ##################################################################
+# ##################################################
 
 # ------------------------------
 # 1. IMPORT, CHECKS AND CLEANING
@@ -116,9 +111,7 @@ sum(is.na(data))
 
 #Check for duplicates
 sum(duplicated(data))
-# Duplicates: 203 rows identical to another row in all 27 columns,
-# including exact income and exact number of days as a customer.
-
+# Duplicates: 203 rows identical to another row in all 27 columns
 # Two different customers matching on every column is very unlikely,
 # so we treat these rows as repeated entries and remove them.
 data <- data[!duplicated(data), ]
@@ -128,16 +121,16 @@ nrow(data)
 #Create TotalPurchases = Total number of purchases through the Web, Catalogue and Store channels.
 data$TotalPurchases <- rowSums(data[purchase_cols])
 
+# --------------------------------------
 # Logic check 1: Total spent = sum(Mnt*)
-####################################################
-
+# --------------------------------------
 all(data$Total_amount_spent == rowSums(data[mnt_cols]))
 # Result: TRUE. Total_amount_spent is built from the Mnt* columns, so it
 # should not be used in the same test or model as those columns.
 
+# ---------------------------------------------------------------------
 # Logic check 2: a customer with 0 purchases should have spent nothing.
-####################################################
-
+# ---------------------------------------------------------------------
 # Customers with 0 purchases but money spent.
 sum(data$TotalPurchases == 0 & data$Total_amount_spent > 0)
 
@@ -148,9 +141,9 @@ data <- data[!(data$TotalPurchases == 0 & data$Total_amount_spent > 0), ]
 nrow(data)
 # 2002 -> 1998 customers.
 
+# -------------------------------------------------------------
 # Logic check 3: n of discount purchases < n of total purchases
-####################################################
-
+# -------------------------------------------------------------
 sum(data$NumDealsPurchases > data$TotalPurchases)
 data[data$NumDealsPurchases > data$TotalPurchases, ]
 # Result: 1 customer breaks this rule
@@ -161,58 +154,79 @@ nrow(data)
 # The remaining checks are run on the 1997 customers left after cleaning.
 # They all pass (or are kept with a reason), so no more rows are removed.
 
+# ------------------------------------------------------------
 # Logic check 4: each customer has exactly one marital status.
+# ------------------------------------------------------------
 # (marital_cols and education_cols are defined in PART 0.)
 table(rowSums(data[marital_cols]))
 # Result: all 1997 customers have exactly one (every row sums to 1).
 
+# -------------------------------------------------------------
 # Logic check 5: each customer has exactly one education level.
+# -------------------------------------------------------------
 table(rowSums(data[education_cols]))
 # Result: all 1997 customers have exactly one (every row sums to 1).
 
+# -----------------------------------------------------------------------------------
 # Logic check 6: indicator columns (marital, education, Complain) contain only 0 or 1.
+# -----------------------------------------------------------------------------------
 all(unlist(data[c(marital_cols, education_cols, "Complain")]) %in% c(0, 1))
 # Result: TRUE.
 
+# ------------------------------------------------
 # Logic check 7: no negative values in any column.
+# ------------------------------------------------
 any(data < 0)
 # Result: FALSE.
 
+# --------------------------------------------------------
 # Logic check 8: all counts and amounts are whole numbers.
+# --------------------------------------------------------
 all(sapply(data, function(x) all(x == round(x))))
 # Result: TRUE.
 
+# --------------------------------------------------------------
 # Logic check 9: number of small children and teenagers at home.
+# --------------------------------------------------------------
 table(data$Kidhome)
 table(data$Teenhome)
 # Result: both only take the values 0, 1 and 2.
 
+# --------------------------------------------------------
 # Logic check 10: income is positive and age is realistic.
+# --------------------------------------------------------
 all(data$Income > 0)
 range(data$Age)
 # Result: TRUE, and ages are 24-80.
 
+# -----------------------------------------------------------------------
 # Logic check 11: the last purchase cannot be before the customer joined.
+# -----------------------------------------------------------------------
 sum(data$Recency > data$Customer_Days)
 # Result: 0 (Recency is 0-99 days, Customer_Days is 2159-2858 days).
 
+# ---------------------------------------------------------------------
 # Logic check 12: a customer with purchases should have spent something
-# (the opposite direction of check 2).
+# ---------------------------------------------------------------------
 sum(data$TotalPurchases > 0 & data$Total_amount_spent == 0)
 # Result: 0.
 
+# -----------------------------------------------------------------------------
 # Logic check 13: age when the customer joined (age minus years as a customer).
+# -----------------------------------------------------------------------------
 age_at_joining <- data$Age - data$Customer_Days / 365
 sum(age_at_joining < 18)
 min(age_at_joining)
 # Result: 4 customers were 16-18 when they joined (youngest about 16.4).
 # We assume that it can happen
 
+# ========================================================================
 # CLEANING LOG:
 # - 0 missing values.
 # - 203 duplicate rows removed (2205 -> 2002).
 # - 5 rows with impossible purchase counts removed (2002 -> 1997).
 # - All other logic checks (4-13) pass.
+# ========================================================================
 
 # ----------------------------------
 # 2. GROUP MARITAL STATUS INDICATORS
@@ -267,7 +281,7 @@ data$schoolinglevel <- factor(
 # Remove the four original education dummy columns.
 data <- data[, !(names(data) %in% education_cols)]
 
-# Quick frequency tables for the two new categorical variables.
+# Frequency tables for the two new categorical variables.
 table(data$Marital_State)
 table(data$schoolinglevel)
 
@@ -309,18 +323,15 @@ data$CataloguePercent <- data$NumCatalogPurchases / data$TotalPurchases * 100
 data$StorePercent <- data$NumStorePurchases / data$TotalPurchases * 100
 
 # Share of each customer's purchases made with a discount (%).
-# (Logic check 3 made sure deal purchases never exceed total purchases.)
 data$DealPercent <- data$NumDealsPurchases / data$TotalPurchases * 100
 
 # ---------------------------
 # 5. SAVE THE CLEANED DATASET
 # ---------------------------
 
-# Everyone uses this file, so nobody cleans the data separately.
 saveRDS(data, clean_file)
 nrow(data)
 # Result: 1997 customers.
-
 
 # ####################################################
 # PART 2. DESCRIPTIVE ANALYSIS, OUTLIERS AND NORMALITY
@@ -336,8 +347,7 @@ dataN <- data[num_cols]
 # Load the e1071 package for skewness() and kurtosis().
 library(e1071)
 
-# Describe one numeric variable: print its statistics and draw its boxplot
-# and histogram.
+# Describe one numeric variable
 # v is the column name as text (e.g. "Income").
 # (,save = TRUE) saves both plots to figures/ (default is False)
 describe_var <- function(v, colour = "lightblue", save = FALSE) {
@@ -380,18 +390,15 @@ describe_var <- function(v, colour = "lightblue", save = FALSE) {
   cat("Skewness:", skew, "\n")
   cat("Excess kurtosis:", kurt, "\n")
 
-  # Split the graph window
   if (!save) {
     par(mfrow = c(1, 2))
   }
 
-  # Boxplot: useful for spread and potential outliers.
   boxplot(x, main = paste0("Boxplot for ", v), col = colour, ylab = v)
   if (save) {
     save_fig(paste0("box_", v))
   }
 
-  # Histogram: shows the distribution of the observed values.
   hist(
     x,
     breaks = 20,
@@ -403,7 +410,6 @@ describe_var <- function(v, colour = "lightblue", save = FALSE) {
     save_fig(paste0("hist_", v))
   }
 
-  # Back to one plot per window
   if (!save) par(mfrow = c(1, 1))
 }
 
@@ -432,16 +438,15 @@ iqr_outliers <- function(x) {
 }
 sapply(dataN, iqr_outliers)
 # Result: Income, Age, Recency, Customer_Days and NumStorePurchases have no outliers.
-# The spending columns have many (e.g. 220 for fruits, 166 for meat), but the
-# histograms and skewness above show these come from the strong right skew,
-# not from errors: a few customers simply spend a lot. They are real customers,
-# so all of them are kept.
+# The spending columns have many (e.g. 220 for fruits, 166 for meat)
+# The histograms and skewness above show these come from the strong right skew, not from errors.
+# They are real customers so all of them are kept.
 
 # --------------------------------------------------------
 # DESCRIPTIVE ANALYSIS: CATEGORICAL AND DISCRETE VARIABLES
 # --------------------------------------------------------
 
-# Number of Small Children per Household. This analysis shows how many customers have 0, 1, or more small children in their households.
+# Number of Small Children per Household. How many customers have 0, 1, or more small children in their households.
 table(data$Kidhome)
 round(prop.table(table(data$Kidhome)) * 100, 2)
 barplot(
@@ -450,7 +455,7 @@ barplot(
   xlab = "Number of Small Children",
   ylab = "Number of Customers",
   col = "lightblue",
-  ylim = c(0, 1200) # so the axis goes above the tallest bar
+  ylim = c(0, 1200)
 )
 save_fig("bar_Kidhome")
 # Observation:
@@ -465,14 +470,14 @@ barplot(
   xlab = "Number of Teenagers",
   ylab = "Number of Customers",
   col = "lightblue",
-  ylim = c(0, 1200) # so the axis goes above the tallest bar
+  ylim = c(0, 1200)
 )
 save_fig("bar_Teenhome")
 # Observation:
 # Most customers have no teenagers at home (51.58%).
 # Customers with one teenager represent 45.97%, while only 2.45% have two.
 
-# Customer Complaints. Complain is a binary variable: 0 indicates no complaint and 1 indicates a complaint. The percentages show how common complaints are among customers.
+# Customer Complaints. Complain is a binary variable: 0 indicates no complaint and 1 indicates a complaint.
 table(data$Complain)
 round(prop.table(table(data$Complain)) * 100, 2)
 # Observation:
@@ -488,8 +493,8 @@ barplot(
   xlab = "Marital Status",
   ylab = "Number of Customers",
   col = "lightblue",
-  ylim = c(0, 800), # so the axis goes above the tallest bar (777)
-  cex.names = 0.8 # smaller bar labels, so "Living together" fits
+  ylim = c(0, 800),
+  cex.names = 0.8
 )
 save_fig("bar_Marital")
 # Observation:
@@ -533,7 +538,7 @@ library(nortest)
 for (v in c("Income", "Age")) {
   x <- data[[v]]
 
-  # Normal Q-Q plot: points far from the line suggest non-normality.
+  # Normal Q-Q plot:
   qqnorm(x, main = paste0("Normal Q-Q plot for ", v), cex = 0.8)
   qqline(x, col = "red", lwd = 2)
   save_fig(paste0("qq_", v))
@@ -541,13 +546,11 @@ for (v in c("Income", "Age")) {
   print("----------------------------------")
   # Kolmogorov-Smirnov test against a normal curve with the same mean and SD.
   # H0: the data are normal; H1: they are not.
-  # suppressWarnings() hides the "ties" warning: Age is in whole years,
-  # so many customers share the same value.
+  # suppressWarnings() for repeated values
   cat("\nVariable:", v, "\n")
   print(suppressWarnings(ks.test(x, "pnorm", mean = mean(x), sd = sd(x))))
 
-  # Lilliefors test: the K-S test corrected for estimating the mean and SD
-  # from the same data (the plain K-S p-value is too large in that case).
+  # Lilliefors test:
   print(lillie.test(x))
   print("----------------------------------")
 }
@@ -564,10 +567,9 @@ for (v in c("Income", "Age")) {
 # Conclusion: none of the 15 numerical variables is normal, so the later analysis uses
 # non-parametric methods (Spearman, Wilcoxon, Kruskal-Wallis).
 
-
-# ##################################################################
+# ##########################
 # PART 3. BIVARIATE ANALYSIS
-# ##################################################################
+# ##########################
 
 # Load ggplot2 for the heatmap and the violin plot
 library(ggplot2)
@@ -578,16 +580,15 @@ library(ggplot2)
 
 cor_matrix <- cor(dataN, method = "spearman")
 
-# Heatmap with ggplot2 (base R heatmap() cannot draw a colour scale bar).
-# ggplot needs one row per pair of variables: as.table() turns the matrix
-# into a table, and as.data.frame() into columns Var1, Var2 and the value.
+# Heatmap with ggplot2
 cor_long <- as.data.frame(as.table(cor_matrix))
 names(cor_long) <- c("Var1", "Var2", "rho")
 
 p_heatmap <- ggplot(cor_long, aes(x = Var1, y = Var2, fill = rho)) +
   geom_tile(color = "white") + # one coloured square per pair
   geom_text(aes(label = round(rho, 2)), size = 2.5) + # the value in each square
-  scale_fill_gradient2( # blue = negative, white = 0, red = positive
+  scale_fill_gradient2(
+    # blue = negative, white = 0, red = positive
     low = "blue",
     mid = "white",
     high = "red",
@@ -611,7 +612,7 @@ round(cor_matrix["Total_amount_spent", ], 2)
 
 # Observations:
 # Income is strongly positively correlated with Total Spending (rho = 0.87).
-# Wine and meat spending each have rho = 0.94 with Total Spending, but this is largely built in: Total Spending is the sum of the Mnt* columns, and wine and meat are its two largest parts.
+# Wine and meat spending each have rho = 0.94 with Total Spending, but this is expected: Total Spending is the sum of the Mnt* columns, and wine and meat are its two largest parts.
 # Website visits show a moderate negative correlation (rho = -0.47).
 # Recency shows almost no correlation with Total Spending (rho = 0.02).
 
@@ -648,7 +649,7 @@ tapply(data$Total_amount_spent, data$Children, median)
 # Observations:
 # Median spending decreases as the number of children increases,
 # from 1117 (0 children) to 62 (3 children).
-# The 3-children group contains only 45 customers, so interpret cautiously.
+# The 3-children group contains only 45 customers.
 
 # ---------------------------------
 # TOTAL SPENDING BY EDUCATION LEVEL
@@ -683,7 +684,7 @@ boxplot(
   xlab = "Marital Status",
   ylab = "Total Amount Spent",
   col = "lightblue",
-  cex.axis = 0.8 # smaller axis labels, so "Living together" fits
+  cex.axis = 0.8
 )
 save_fig("box_spending_marital")
 # Observations:
@@ -722,7 +723,6 @@ channel_percentages <- c(
 )
 round(channel_percentages, 2)
 
-# barplot() returns the x-position of each bar, used to place the labels.
 bar_pos <- barplot(
   channel_percentages,
   main = "Average Percentage of Purchases by Channel",
@@ -796,7 +796,7 @@ bar_pos <- barplot(
   xlab = "Income Group",
   ylab = "Average Number of Purchases",
   col = "lightblue",
-  ylim = c(0, 22) # so the axis goes above the tallest bar (19.4)
+  ylim = c(0, 22)
 )
 text(
   bar_pos,
@@ -942,7 +942,6 @@ tapply(data$Total_amount_spent, customer_days_group, median)
 # How long ago a customer last bought tells us nothing about how much they spend.
 # Length of relationship has a weak positive relationship with spending (rho = 0.18). Comparing the medians: from 150.5 for the newest customers, to 523 for the longest customers. Spending (Total_amount_spent) covers the last 2 years only, and every customer has been with the company for at least 5.9 years, so all had the full 2 years. So long-term customers spend more over the same period.
 
-
 # ##########################
 # PART 4. HYPOTHESIS TESTING
 # ##########################
@@ -987,9 +986,9 @@ p_values["number of children"] <- test2$p.value
 
 # Which groups differ?
 pairwise.wilcox.test(
-    data$Total_amount_spent,
-    data$Children,
-    p.adjust.method = "BH"
+  data$Total_amount_spent,
+  data$Children,
+  p.adjust.method = "BH"
 )
 # Result: p < 0.001, reject H0.
 # Spending falls with every extra child from 0 to 2 but the groups with 2 or 3 children do not differ much (p = 0.15),
@@ -1006,9 +1005,9 @@ p_values["education"] <- test3$p.value
 
 # Which levels differ?
 pairwise.wilcox.test(
-    data$Total_amount_spent,
-    data$schoolinglevel,
-    p.adjust.method = "BH"
+  data$Total_amount_spent,
+  data$schoolinglevel,
+  p.adjust.method = "BH"
 )
 # Result: p < 0.001, reject H0.
 # - High school customers spend much less than every other level (all p < 0.001; median 40).
@@ -1040,8 +1039,8 @@ cor.test(data$Age, data$Total_amount_spent, method = "spearman", exact = FALSE)
 older <- data[data$Age >= 60, ]
 tapply(older$Total_amount_spent, older$Marital_State == "Widow", median)
 wilcox.test(
-    older$Total_amount_spent[older$Marital_State == "Widow"],
-    older$Total_amount_spent[older$Marital_State != "Widow"]
+  older$Total_amount_spent[older$Marital_State == "Widow"],
+  older$Total_amount_spent[older$Marital_State != "Widow"]
 )
 # Result: p = 0.67. Among customers aged 60+, widows (44 customers, median 606) spend about the same as non-widows (median 546).
 # So the higher widow spending is explained by age and not by marital status.
@@ -1052,10 +1051,10 @@ wilcox.test(
 # H0: there is no monotonic relationship between income and spending (rho = 0).
 # H1: there is one (rho is not 0).
 test5 <- cor.test(
-    data$Income,
-    data$Total_amount_spent,
-    method = "spearman",
-    exact = FALSE
+  data$Income,
+  data$Total_amount_spent,
+  method = "spearman",
+  exact = FALSE
 )
 test5
 p_values["income"] <- test5$p.value
@@ -1118,10 +1117,10 @@ pairwise.wilcox.test(data$DealPercent, data$Children, p.adjust.method = "BH")
 # H0: no monotonic relationship between discount share and income.
 # H1: there is one.
 test9 <- cor.test(
-    data$DealPercent,
-    data$Income,
-    method = "spearman",
-    exact = FALSE
+  data$DealPercent,
+  data$Income,
+  method = "spearman",
+  exact = FALSE
 )
 test9
 p_values["discounts: income"] <- test9$p.value
@@ -1135,10 +1134,10 @@ p_values["discounts: income"] <- test9$p.value
 # H0: no monotonic relationship between web visits and web purchases.
 # H1: there is one.
 test10 <- cor.test(
-    data$NumWebVisitsMonth,
-    data$NumWebPurchases,
-    method = "spearman",
-    exact = FALSE
+  data$NumWebVisitsMonth,
+  data$NumWebPurchases,
+  method = "spearman",
+  exact = FALSE
 )
 test10
 p_values["web visits vs purchases"] <- test10$p.value
@@ -1153,10 +1152,10 @@ p_values["web visits vs purchases"] <- test10$p.value
 # H0: no monotonic relationship between days as a customer and spending.
 # H1: there is one.
 test11 <- cor.test(
-    data$Customer_Days,
-    data$Total_amount_spent,
-    method = "spearman",
-    exact = FALSE
+  data$Customer_Days,
+  data$Total_amount_spent,
+  method = "spearman",
+  exact = FALSE
 )
 test11
 p_values["customer days"] <- test11$p.value
@@ -1172,10 +1171,10 @@ p_values["customer days"] <- test11$p.value
 # H0: no monotonic relationship between recency and spending.
 # H1: there is one.
 test12 <- cor.test(
-    data$Recency,
-    data$Total_amount_spent,
-    method = "spearman",
-    exact = FALSE
+  data$Recency,
+  data$Total_amount_spent,
+  method = "spearman",
+  exact = FALSE
 )
 test12
 p_values["recency"] <- test12$p.value
@@ -1189,9 +1188,9 @@ p_values["recency"] <- test12$p.value
 # With many tests at the 0.05 level, some could be significant by chance.
 # The Benjamini-Hochberg (BH) correction adjusts the p-values for this.
 results <- data.frame(
-    test = names(p_values),
-    p_value = signif(p_values, 3),
-    p_adjusted = signif(p.adjust(p_values, method = "BH"), 3)
+  test = names(p_values),
+  p_value = signif(p_values, 3),
+  p_adjusted = signif(p.adjust(p_values, method = "BH"), 3)
 )
 results$significant <- results$p_adjusted < 0.05
 rownames(results) <- NULL
@@ -1201,16 +1200,14 @@ results
 # web visits vs purchases (but very weak), customer days.
 # Not significant: marital status, marital vs education, complaints (both), recency.
 
-
 # ######################################
 # PART 5. PCA, CLUSTERING AND REGRESSION
 # ######################################
 
-
 # ------------------------------------------
 # PART A: PCA (Principal Component Analysis)
 # ------------------------------------------
-# Goal: see which variables "move together", and get 2 summary axes (PC1 and PC2) that 
+# Goal: see which variables "move together", and get 2 summary axes (PC1 and PC2) that
 # can be used to plot all customers on one graph.
 
 # Step A1. Choose the variables: income, spending on each product, purchases
@@ -1230,8 +1227,8 @@ round(pca$rotation[, 1:2], 2)
 # Result:
 # - PC1 = "overall buying power". Income, all spending columns and all
 #   purchase channels have similar loadings (-0.23 to -0.38), and web visits
-#   has the opposite sign (0.27). The sign itself has no meaning (R picks it
-#   at random), so here a LOW PC1 score means high income and high spending.
+#   has the opposite sign (0.27).
+#   A LOW PC1 score means high income and high spending.
 # - PC2 = "online wine buyers". It is highest for web purchases (0.63),
 #   web visits (0.44) and wine (0.40), and negative for fish, fruit and
 #   sweets (-0.21 to -0.26).
@@ -1239,20 +1236,18 @@ round(pca$rotation[, 1:2], 2)
 # how much they earn and spend (PC1). The second, much smaller difference is
 # whether they buy online and buy wine, or buy more fresh and sweet products.
 
-
 # ------------------------------------------------------
 # PART B: CLUSTERING with k-means
 # ------------------------------------------------------
 # Goal: split customers into groups with similar behaviour
 
 # Step B1. Choose and scale the variables.
-# Customer behaviour: income, spending on each product, purchases per channel
-# and web visits. Total_amount_spent is left out because it is the sum of the
-# Mnt* columns (it would count spending twice).
+# Customer behaviour: income, spending on each product, purchases per channel and web visits.
+# Total_amount_spent is left out because it is the sum of the Mnt* columns
 cluster_vars <- c("Income", mnt_cols, purchase_cols, "NumWebVisitsMonth")
 cluster_data <- data[, cluster_vars]
 
-# k-means groups customers by distance, so all variables are scaled first for the same reason as before.
+# All variables are scaled first for the same reason as before.
 scaled_cluster_data <- scale(cluster_data)
 
 # Step B2. Choose the number of clusters k with the ELBOW method.
@@ -1263,7 +1258,12 @@ scaled_cluster_data <- scale(cluster_data)
 tot_withinss <- numeric(10)
 for (k in 1:10) {
   set.seed(123)
-  km_temp <- kmeans(scaled_cluster_data, centers = k, nstart = 25, iter.max = 50)
+  km_temp <- kmeans(
+    scaled_cluster_data,
+    centers = k,
+    nstart = 25,
+    iter.max = 50
+  )
   tot_withinss[k] <- km_temp$tot.withinss
 }
 plot(
@@ -1289,7 +1289,12 @@ dist_matrix <- dist(scaled_cluster_data)
 avg_sil_widths <- numeric(10)
 for (k in 2:10) {
   set.seed(123)
-  km_temp <- kmeans(scaled_cluster_data, centers = k, nstart = 25, iter.max = 50)
+  km_temp <- kmeans(
+    scaled_cluster_data,
+    centers = k,
+    nstart = 25,
+    iter.max = 50
+  )
   sil_obj <- silhouette(km_temp$cluster, dist_matrix)
   avg_sil_widths[k] <- mean(sil_obj[, 3])
 }
@@ -1317,7 +1322,12 @@ round(avg_sil_widths[2:10], 3)
 # Step B4. Run the final k-means with k = 3.
 chosen_k <- 3
 set.seed(123)
-final_km <- kmeans(scaled_cluster_data, centers = chosen_k, nstart = 25, iter.max = 50)
+final_km <- kmeans(
+  scaled_cluster_data,
+  centers = chosen_k,
+  nstart = 25,
+  iter.max = 50
+)
 
 # Add each customer's cluster to the data as a factor.
 data$Cluster <- factor(final_km$cluster)
@@ -1325,9 +1335,7 @@ table(data$Cluster)
 # Result: cluster 1 = 960 customers, cluster 2 = 491, cluster 3 = 546.
 
 # Step B5. Describe each cluster.
-# Medians of the ORIGINAL (unscaled) variables, so the numbers are easy to read.
-# Children, Age and the purchase shares were NOT used for clustering, but they
-# help describe the groups.
+# Medians of the original variables.
 cluster_profile <- aggregate(
   cbind(
     Income,
@@ -1393,13 +1401,10 @@ legend(
   pch = 19
 )
 save_fig("cluster_income_vs_spending")
-# Result: cluster 1 (budget families) is clearly separate: low income and low
-# spending. Clusters 2 and 3 overlap at mid-to-high incomes - they differ less in
-# income and more in HOW they buy (children, catalogue vs web, wine vs meat),
-# which a 2-variable plot cannot show.
+# Result: cluster 1 (budget families) is separate: low income and low
+# spending. Clusters 2 and 3 overlap at mid-to-high incomes
 # Note: 5 of the 10 clustering variables are spending columns, so spending has
-# a large weight in the clustering - which is why the clusters follow spending
-# level so closely.
+# a large weight in the clustering
 
 # The customers on the two PCA axes from PART A, coloured by cluster.
 plot(
@@ -1429,12 +1434,10 @@ round(tapply(pca$x[, 2], data$Cluster, median), 2)
 # (1.06), because they buy online and buy wine the most. So clusters 2 and 3,
 # which overlap in income, are told apart by HOW they buy.
 
-
 # ------------------------------------------------------
 # PART C: REGRESSION - what explains spending?
 # ------------------------------------------------------
-# Goal: measure the effect of each customer characteristic on spending,
-# while holding the others fixed (e.g. the effect of children at the same income).
+# Goal: measure the effect of each customer characteristic on spending, while holding the others fixed.
 
 # Step C1. Response variable: log(Total_amount_spent).
 # Spending is strongly right-skewed. The log makes it more symmetric
@@ -1450,13 +1453,12 @@ save_fig("hist_log_spending")
 
 # Step C2. Fit the model.
 # Predictors: income, number of children, age, education and marital status.
-# factor(..., ordered = FALSE) gives the usual "bachelor vs hs" comparisons
-# (hs and Divorced are the reference groups).
-# Spending and purchase columns are NOT used as predictors: they are part of
-# spending itself.
 spending_model <- lm(
-  log_spending ~ Income + Children + Age +
-    factor(schoolinglevel, ordered = FALSE) + Marital_State,
+  log_spending ~ Income +
+    Children +
+    Age +
+    factor(schoolinglevel, ordered = FALSE) +
+    Marital_State,
   data = data
 )
 summary(spending_model)
@@ -1479,20 +1481,3 @@ round((exp(coef(spending_model)["Income"] * 10000) - 1) * 100, 1)
 # - Marital status: NOT significant (all p > 0.4), which agrees with test 4.
 # - R-squared = 0.73: the model explains 73% of the variation in log(spending),
 #   mostly thanks to income and children.
-
-# Step C4. Check the model assumptions.
-par(mfrow = c(2, 2))
-plot(spending_model)
-save_fig("regression_diagnostics")
-par(mfrow = c(1, 1))
-# - Normal Q-Q: the points follow the line closely except for a couple of
-#   extreme customers, so the residuals are roughly normal.
-# - Residuals vs Fitted: the red line curves (an arch) instead of staying flat
-#   at 0. The model misses part of the pattern: spending does not rise in a
-#   straight line with income (it stays low and then rises steeply, as in the
-#   income vs spending scatterplot in PART 3).
-# - Scale-Location: the spread of the residuals is a little uneven across the
-#   fitted values.
-# - Residuals vs Leverage: no customer has a large influence on the model.
-# Limitation for the report: the model fits well overall (R-squared 0.73),
-# but the curved income effect is not fully captured by a straight-line model.
