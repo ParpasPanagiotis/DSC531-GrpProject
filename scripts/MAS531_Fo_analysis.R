@@ -521,6 +521,11 @@ save_fig("bar_Education")
 # A normality test only makes sense when the histogram looks roughly bell-shaped.
 # From the histograms above, 13 of the 15 variables are clearly not normal, so they are not tested:
 # -> Strongly right-skewed:
+#       `MntWines`,
+#       `MntFruits`,
+#       `MntMeatProducts`,
+#       `MntFishProducts`,
+#       `MntSweetProducts`,
 #       `Total_amount_spent`,
 #       `NumDealsPurchases`,
 #       `NumWebPurchases`,
@@ -688,7 +693,7 @@ boxplot(
 )
 save_fig("box_spending_marital")
 # Observations:
-# Widowed customers have the highest median spending (597
+# Widowed customers have the highest median spending (597)
 # Other groups are similar median (303-350).
 # The widow group is small (69 customers) and likely older, so this may reflect age rather than marital status.
 

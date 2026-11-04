@@ -232,7 +232,7 @@ Some groups (high school, widows, complainers, 3 children) are small, so tests i
 
 \subsection{Normality}
 \label{sec:normality}
-A normality test only makes sense when the histogram looks roughly bell-shaped. From the histograms, 13 of the 15 variables are clearly not normal: spending and purchase counts are strongly right-skewed, and Recency and Customer\_Days are flat. These were not tested. Only Income and Age look roughly symmetric, so only these two were checked, with a normal Q-Q plot, the Kolmogorov--Smirnov (K-S) test and the Lilliefors test (Figure~\ref{fig:qq}).
+A normality test only makes sense when the histogram looks roughly bell-shaped. From the histograms, 13 of the 15 variables are clearly not normal: spending and purchase counts are strongly right-skewed, Recency and Customer\_Days are flat, and web visits has most values between 0 and 9 with a few extreme high values (up to 20). These were not tested. Only Income and Age look roughly symmetric, so only these two were checked, with a normal Q-Q plot, the Kolmogorov--Smirnov (K-S) test and the Lilliefors test (Figure~\ref{fig:qq}).
 
 \begin{itemize}
 	\item \textbf{Income:} $D = 0.047$ (K-S $p = 0.0003$, Lilliefors $p < 0.001$).
@@ -650,7 +650,6 @@ With a log response, a coefficient $\beta$ means that spending changes by about 
 	\item \textbf{Small groups:} high school (49), widows (69), 3 children (45) and complainers (19). Tests on these groups have low power.
 	\item \textbf{Different time periods:} website visits cover only the last month, while spending and purchases cover the last 2 years.
 	\item \textbf{Correlation is not causation:} the analysis shows associations, not causes. For example, children are related to lower spending, but other factors linked to having children may also play a role.
-	\item \textbf{Regression:} the straight-line model does not fully capture the curved effect of income.
 	\item \textbf{Clustering:} the choice of $k = 3$ is partly a judgement call ($k = 2$ had a higher silhouette), and the result depends on which variables are used.
 	\item \textbf{Duplicates:} we assumed that the 203 identical rows are repeated entries. If some were real customers, a small amount of data was lost.
 \end{itemize}
@@ -661,7 +660,7 @@ With a log response, a coefficient $\beta$ means that spending changes by about 
 \label{app:extra}
 
 \subsection{Histograms of all numerical variables}
-Figure~\ref{fig:allhist} shows the distribution of each of the 15 numerical variables. Spending and purchase counts are right-skewed, Recency and Customer\_Days are roughly flat, and only Income and Age look roughly symmetric (Section~\ref{sec:normality}).
+Figure~\ref{fig:allhist} shows the distribution of each of the 15 numerical variables. Spending and purchase counts are right-skewed, Recency and Customer\_Days are roughly flat, web visits has a few extreme high values, and only Income and Age look roughly symmetric (Section~\ref{sec:normality}).
 
 \begin{figure}[H]
 	\centering
